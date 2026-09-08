@@ -110,6 +110,9 @@ jobSchema.index({
 //for filtering
 jobSchema.index({ workMode: 1, employmentType: 1, experienceLevel: 1 });
 
+//for company job feed, sorted newest first
+jobSchema.index({ company: 1, createdAt: -1 });
+
 jobSchema.pre("validate", function (next) {
   if (
     this.salary?.salaryMax !== undefined &&

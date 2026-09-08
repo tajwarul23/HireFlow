@@ -34,7 +34,15 @@ const RecruitPipelineApplicantList = ({
   setSelectedApplication,
   statusFilter,
 }) => {
-  const { data, isLoading, isError, error } = useGetAllApplicationForCompany({
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useGetAllApplicationForCompany({
     job: selectedJobId,
     status: statusFilter,
   });
@@ -50,7 +58,7 @@ const RecruitPipelineApplicantList = ({
     pendingVariables?.applicationId === applicationId &&
     pendingVariables?.status === status;
 
-  const applications = data?.data?.applications ?? [];
+  const applications = data?.pages?.flatMap((p) => p?.data?.applications ?? []) ?? [];
 
   const updateStatusRef = useRef(null);
 
@@ -410,6 +418,16 @@ const RecruitPipelineApplicantList = ({
           </div>
         );
       })}
+      {hasNextPage && (
+        <button
+          type="button"
+          onClick={() => fetchNextPage()}
+          disabled={isFetchingNextPage}
+          className="w-full rounded-xl border border-line bg-surface py-2 text-sm font-semibold text-muted transition-colors hover:border-violet/40 hover:text-violet disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+        >
+          {isFetchingNextPage ? "Loading..." : "Load more applicants"}
+        </button>
+      )}
       <UpdateJobStatusModalBody
         updateStatusRef={updateStatusRef}
         applicationId={pendingUpdate?.applicationId}

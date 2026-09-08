@@ -13,7 +13,12 @@ import { useRef } from "react";
 
 const RecruitPipeline = () => {
   const { isError, error } = useGetCompany();
-  const { data: jobsData } = useGetCompanyJobFeed();
+  const {
+    data: jobsData,
+    fetchNextPage: fetchNextJobsPage,
+    hasNextPage: hasNextJobsPage,
+    isFetchingNextPage: isFetchingNextJobsPage,
+  } = useGetCompanyJobFeed();
 
   const [searchParams] = useSearchParams();
   const jobParam = searchParams.get("job");
@@ -27,7 +32,7 @@ const RecruitPipeline = () => {
 
   
   useEffect(() => {
-    const jobs = jobsData?.data?.jobs ?? [];
+    const jobs = jobsData?.pages?.flatMap((p) => p?.data?.jobs ?? []) ?? [];
     if(jobs.length === 0 || selectedJobId)return;
 
     const jobExists = jobParam && jobs.some((j)=> j._id === jobParam);
@@ -43,7 +48,7 @@ const RecruitPipeline = () => {
     }
   }, [isError, error]);
 
-  const jobs = jobsData?.data?.jobs ?? [];
+  const jobs = jobsData?.pages?.flatMap((p) => p?.data?.jobs ?? []) ?? [];
   const hasJobs = jobs.length > 0;
 
   // When recruiter changes job,
@@ -78,6 +83,16 @@ const RecruitPipeline = () => {
               selectedJobId={selectedJobId}
               setSelectedJobId={handleJobChange}
             />
+            {hasNextJobsPage && (
+              <button
+                type="button"
+                onClick={() => fetchNextJobsPage()}
+                disabled={isFetchingNextJobsPage}
+                className="mt-2 w-full rounded-xl border border-line bg-surface py-2 text-sm font-semibold text-muted transition-colors hover:border-violet/40 hover:text-violet disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              >
+                {isFetchingNextJobsPage ? "Loading..." : "Load more jobs"}
+              </button>
+            )}
           </div>
 
           {/* APPLICANTS */}

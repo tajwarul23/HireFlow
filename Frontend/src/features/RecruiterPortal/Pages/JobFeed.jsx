@@ -17,12 +17,15 @@ const JobFeed = () => {
   const applicationLength = data?.data?.applicationLength;
   // console.log(company, applicationLength);
 
-  const { data: companyJobs } = useGetCompanyJobFeed();
-  const { data: platformJobs } = useGetCompanyJobFeed();
+  const {
+    data: companyJobs,
+    fetchNextPage: fetchNextCompanyJobsPage,
+    hasNextPage: hasNextCompanyJobsPage,
+    isFetchingNextPage: isFetchingNextCompanyJobsPage,
+  } = useGetCompanyJobFeed();
 
-  const activeData = viewMode === "company" ? companyJobs : platformJobs;
-  const hasJobs = activeData?.data?.count;
-  const jobList = activeData?.data?.jobs || [];
+  const hasJobs = companyJobs?.pages?.[0]?.data?.count ?? 0;
+  const jobList = companyJobs?.pages?.flatMap((p) => p?.data?.jobs ?? []) ?? [];
 
   return (
     <div className="min-h-screen bg-app">
@@ -137,11 +140,23 @@ const JobFeed = () => {
         {/* Job Feed */}
         {viewMode === "company" &&
           (jobList.length > 0 ? (
-            <div className="grid  gap-4 mt-6">
-              {jobList.map((job) => (
-                <JobCard key={job._id || job.id} job={job} view={"company"} />
-              ))}
-            </div>
+            <>
+              <div className="grid  gap-4 mt-6">
+                {jobList.map((job) => (
+                  <JobCard key={job._id || job.id} job={job} view={"company"} />
+                ))}
+              </div>
+              {hasNextCompanyJobsPage && (
+                <button
+                  type="button"
+                  onClick={() => fetchNextCompanyJobsPage()}
+                  disabled={isFetchingNextCompanyJobsPage}
+                  className="mt-4 w-full rounded-xl border border-line bg-surface py-2.5 text-sm font-semibold text-muted transition-colors hover:border-violet/40 hover:text-violet disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                >
+                  {isFetchingNextCompanyJobsPage ? "Loading..." : "Load more jobs"}
+                </button>
+              )}
+            </>
           ) : (
             <EmptyPipeline from="jobFeed" />
           ))}

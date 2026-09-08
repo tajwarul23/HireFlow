@@ -330,21 +330,45 @@ export const getCompanyJobFeedController = asyncHandler(async (req, res) => {
     throw new ApiError(400, "User is not associated with any company");
   }
 
-  const jobs = await JobModel.find({
-    company: dbUser.company,
-  })
-    .populate({
-      path: "postedBy",
-      select: "userName _id company",
-    })
-    .sort({ createdAt: -1 })
-    
+  const { page = 1, limit = 20 } = req.query;
+
+  // cap page size so a caller can't force an unbounded fetch via ?limit=
+  const pageSize = Math.min(Number(limit) || 20, 100);
+  const skip = Number(page - 1) * pageSize;
+
+  const filter = { company: dbUser.company };
+
+  const [jobs, totalJobs] = await Promise.all([
+    JobModel.find(filter)
+      .populate({
+        path: "postedBy",
+        select: "userName _id company",
+      })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(pageSize)
+      .lean(),
+
+    JobModel.countDocuments(filter),
+  ]);
+
   return res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        { count: jobs.length, jobs },
+        {
+          count: totalJobs,
+          jobs,
+          pagination: {
+            totalJobs,
+            currentPage: Number(page),
+            totalPage: Math.ceil(totalJobs / pageSize),
+            limit: pageSize,
+            hasNextPage: Number(page) < Math.ceil(totalJobs / pageSize),
+            hasPreviousPage: Number(page) > 1,
+          },
+        },
         "Company Jobs fetched successfully",
       ),
     );

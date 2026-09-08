@@ -89,6 +89,9 @@ const interviewReportSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// getAllInterviewReportController filters by user, sorted newest first
+interviewReportSchema.index({ user: 1, createdAt: -1 });
+
 export const interviewReportModel = mongoose.model(
   "interviewReport",
   interviewReportSchema,

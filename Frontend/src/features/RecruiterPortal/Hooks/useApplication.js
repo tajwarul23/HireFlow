@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { analyzePrepApi, applyToJobApi, getAllApplicationForCompanyApi, updateApplicationStatusApi } from "../Services/application.api.js";
 import { useContext } from "react";
 import { AuthContext } from "../../Auth/auth.context";
@@ -8,17 +8,26 @@ import toast from "react-hot-toast";
 export const useGetAllApplicationForCompany = (filters = {}) => {
   const {user} = useContext(AuthContext);
   const company = user?.company
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ["companyApplications", company, filters],
 
-    queryFn: () => getAllApplicationForCompanyApi(filters),
+    queryFn: ({ pageParam = 1 }) =>
+      getAllApplicationForCompanyApi({ ...filters, page: pageParam }),
+
+    initialPageParam: 1,
+
+    getNextPageParam: (lastPage) =>
+      lastPage?.data?.pagination?.hasNextPage
+        ? lastPage.data.pagination.currentPage + 1
+        : undefined,
 
     enabled: !!filters.job && !!company,
 
     staleTime: 60 * 1000,
 
     refetchInterval: (query) => {
-      const applications = query.state.data?.data?.applications ?? [];
+      const pages = query.state.data?.pages ?? [];
+      const applications = pages.flatMap((p) => p?.data?.applications ?? []);
 
       const isGenerating = applications.some(
         (application) => application.recruiterReportStatus === "generating",

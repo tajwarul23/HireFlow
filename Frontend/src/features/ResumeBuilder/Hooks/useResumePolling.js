@@ -14,7 +14,7 @@ const useResumePolling = (resumeId, initialIsSaving) => {
 
     intervalRef.current = setInterval(async () => {
       try {
-        const { data } = await axios.get(`https://gen-ai-job-preparation-project.onrender.com/api/resume/${resumeId}`, {
+        const { data } = await axios.get(`https://hireflow-r73i.onrender.com/api/resume/${resumeId}`, {
           withCredentials: true,
         });
 

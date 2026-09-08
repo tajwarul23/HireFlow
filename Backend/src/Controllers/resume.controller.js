@@ -167,9 +167,9 @@ export const getResumeById = async (req, res) => {
  */
 export const getAllResume = async (req, res) => {
   try {
-    const allResume = await ResumeModel.find({ user: req.user.id }).sort({
-      createdAt: -1,
-    });
+    const allResume = await ResumeModel.find({ user: req.user.id })
+      .sort({ createdAt: -1 })
+      .lean();
     if (!allResume.length) {
       return res
         .status(200)

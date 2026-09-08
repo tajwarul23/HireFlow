@@ -10,8 +10,8 @@ export const createJobApi = async(data)=>{
     return response.data;
 }
 
-export const getCompanyJobFeedApi = async()=>{
-    const response = await api.get("/company");
+export const getCompanyJobFeedApi = async({ page = 1 } = {})=>{
+    const response = await api.get("/company", { params: { page } });
     return response.data;
 }
 

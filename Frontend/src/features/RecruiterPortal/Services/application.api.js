@@ -9,8 +9,9 @@ export const getAllApplicationForCompanyApi = async ({
   job,
   status,
   sort,
+  page = 1,
 } = {}) => {
-  const params = {};
+  const params = { page };
   if (job) params.job = job;
   if (status) params.status = status;
   if (sort) params.sort = sort;

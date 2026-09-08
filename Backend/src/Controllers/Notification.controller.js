@@ -5,7 +5,7 @@ export const getNotification = async (req, res) =>{
   try {
     const {cursor, limit} = req.query;
 
-    const pageSize = Math.min(Number(limit) || 15);
+    const pageSize = Math.min(Number(limit) || 15, 100);
     const query = {recipient: req.user.id};
     if(cursor){
       if(!mongoose.Types.ObjectId.isValid(cursor)){

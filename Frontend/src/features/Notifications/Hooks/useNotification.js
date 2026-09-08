@@ -33,7 +33,7 @@ export const useUnreadNotificationCount = () => {
     queryKey: UNREAD_COUNT_KEY,
     queryFn: getUnreadNotificationCountApi,
     enabled: !!user?.id,
-    refetchInterval: 10 * 1000,
+    refetchInterval: 60 * 1000,
     refetchIntervalInBackground: false,
   });
 };

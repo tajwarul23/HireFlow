@@ -99,7 +99,8 @@ export const getAllInterviewReportController = async (req, res) => {
   try {
     const allReport = await interviewReportModel
       .find({ user: req.user.id })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
     return res.status(200).json({
       message: allReport.length
         ? "Fetched all interview reports"

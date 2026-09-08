@@ -135,7 +135,10 @@ export const getCandidateApplicationsController = async (req, res) => {
 
     const sortOption = sort === "oldest" ? { createdAt: 1 } : { createdAt: -1 };
 
-    const skip = Number(page - 1) * Number(limit);
+    // cap page size so a caller can't force an unbounded fetch via ?limit=
+    const pageSize = Math.min(Number(limit) || 10, 100);
+
+    const skip = Number(page - 1) * pageSize;
 
     const [applications, totalApplications] = await Promise.all([
       applicationModel
@@ -155,7 +158,7 @@ export const getCandidateApplicationsController = async (req, res) => {
 
         .sort(sortOption)
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(pageSize),
 
       applicationModel.countDocuments(filter),
     ]);
@@ -168,10 +171,10 @@ export const getCandidateApplicationsController = async (req, res) => {
           pagination: {
             totalApplications,
             currentPage: Number(page),
-            totalPage: Math.ceil(totalApplications / Number(limit)),
-            limit: Number(limit),
+            totalPage: Math.ceil(totalApplications / pageSize),
+            limit: pageSize,
             hasNextPage:
-              Number(page) < Math.ceil(totalApplications / Number(limit)),
+              Number(page) < Math.ceil(totalApplications / pageSize),
             hasPreviousPage: Number(page) > 1,
           },
         },
@@ -192,7 +195,7 @@ export const getCandidateApplicationsController = async (req, res) => {
 
 export const getCompanyApplicationsController = async (req, res) => {
   try {
-    const { status, job, sort = "newest" } = req.query;
+    const { status, job, sort = "newest", page = 1, limit = 20 } = req.query;
 
     const filter = {
       company: req.user.company,
@@ -206,35 +209,54 @@ export const getCompanyApplicationsController = async (req, res) => {
       filter.job = job;
     }
 
-    
+    const pageSize = Math.min(Number(limit) || 20, 100);
+    const skip = Number(page - 1) * pageSize;
 
-    const applications = await applicationModel
-      .find(filter)
-      .populate({
-        path: "candidate",
-        select: "userName email",
-      })
-      .populate({
-        path: "job",
-        select: "title description employmentType workMode",
-      })
-      .populate({
-        path: "resume",
-        select: "title resumeUrl thumbnailUrl",
-      })
-      .populate({
-        path: "recruiterReport",
-        select:
-          "skillGaps weaknesses strengths executiveSummary hiringRecommendation matchScore",
-      })
-      .sort({matchScore:-1});
+    const [applications, totalApplications] = await Promise.all([
+      applicationModel
+        .find(filter)
+        .populate({
+          path: "candidate",
+          select: "userName email",
+        })
+        .populate({
+          path: "job",
+          select: "title description employmentType workMode",
+        })
+        .populate({
+          path: "resume",
+          select: "title resumeUrl thumbnailUrl",
+        })
+        .populate({
+          path: "recruiterReport",
+          select:
+            "skillGaps weaknesses strengths executiveSummary hiringRecommendation matchScore",
+        })
+        .sort({matchScore:-1})
+        .skip(skip)
+        .limit(pageSize)
+        .lean(),
+
+      applicationModel.countDocuments(filter),
+    ]);
 
     return res
       .status(200)
       .json(
         new ApiResponse(
           200,
-          { applications },
+          {
+            applications,
+            pagination: {
+              totalApplications,
+              currentPage: Number(page),
+              totalPage: Math.ceil(totalApplications / pageSize),
+              limit: pageSize,
+              hasNextPage:
+                Number(page) < Math.ceil(totalApplications / pageSize),
+              hasPreviousPage: Number(page) > 1,
+            },
+          },
           "Applications fetched successfully",
         ),
       );

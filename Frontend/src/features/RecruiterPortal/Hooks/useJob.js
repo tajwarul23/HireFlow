@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   createJobApi,
   deleteJobApi,
@@ -16,9 +16,14 @@ import { AuthContext } from "../../Auth/auth.context";
 //-----------------QUERIES------------------------------
 export const useGetCompanyJobFeed = () => {
   const {user} = useContext(AuthContext);
-  return useQuery({
-    queryFn: getCompanyJobFeedApi,
+  return useInfiniteQuery({
+    queryFn: ({ pageParam = 1 }) => getCompanyJobFeedApi({ page: pageParam }),
     queryKey: ["companyJobFeed", user?.company],
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage?.data?.pagination?.hasNextPage
+        ? lastPage.data.pagination.currentPage + 1
+        : undefined,
     staleTime: 5 * 60 * 1000,
     enabled: !!user?.company
   });

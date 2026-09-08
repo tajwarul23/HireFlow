@@ -341,40 +341,42 @@ export const getCompanyController = asyncHandler(async (req, res) => {
       message: "Company not found",
     });
   }
-  const applicationLength = await applicationModel.countDocuments({
-    company: req.company._id,
-  });
   const company = req.company;
 
-  const employeeDetails = await CompanyModel.aggregate([
-    {
-      $match: {
-        _id: req.company._id,
+  const [applicationLength, employeeDetails] = await Promise.all([
+    applicationModel.countDocuments({
+      company: req.company._id,
+    }),
+    CompanyModel.aggregate([
+      {
+        $match: {
+          _id: req.company._id,
+        },
       },
-    },
-    {
-      $lookup: {
-        from: "users",
-        localField: "_id",
-        foreignField: "company",
-        as: "employees",
-        pipeline: [
-          {
-            $project: {
-              userName: 1,
-              email: 1,
-              role: 1,
-              createdAt: 1,
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "company",
+          as: "employees",
+          pipeline: [
+            {
+              $project: {
+                userName: 1,
+                email: 1,
+                role: 1,
+                createdAt: 1,
+              },
             },
-          },
-        ],
+          ],
+        },
       },
-    },
-    {
-      $addFields: {
-        employeeCount: { $size: "$employees" },
+      {
+        $addFields: {
+          employeeCount: { $size: "$employees" },
+        },
       },
-    },
+    ]),
   ]);
   return res
     .status(200)
