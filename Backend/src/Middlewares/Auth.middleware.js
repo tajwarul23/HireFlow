@@ -9,11 +9,12 @@ export const verifyToken = async(req, res, next) => {
   if (!token) {
     return res.status(401).json({ message: "Please Login to visit the page" });
   }
-  const isTokenBlackListed = await  TokenBlacklistModel.findOne({token});
+ 
+  try {
+     const isTokenBlackListed = await  TokenBlacklistModel.findOne({token});
   if(isTokenBlackListed){
     return res.status(401).json({message:"Token is blacklisted. Please login again."})
   }
-  try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await userModel.findById(decoded.id).select("_id role company email userName")
     if(!user){
