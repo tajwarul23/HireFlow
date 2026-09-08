@@ -7,17 +7,15 @@ import ProtectedLayout from "./features/Layout/ProtectedLayout.jsx";
 import HomePage from "./features/Home/HomePage.jsx";
 import NotFound from "./features/Layout/NotFound.jsx";
 import SpinLoader from "./Shared/SpinLoader.jsx";
-import CandidateDashBoard from "./features/Candidate/CandidateDashBoard.jsx";
 
-
-import RecruiterDashBoard from "./features/RecruiterPortal/Pages/RecruiterDashBoard.jsx";
-
-import OnBoardCompany from "./features/RecruiterPortal/Pages/OnBoardCompany.jsx";
-import JobFeed from "./features/RecruiterPortal/Pages/JobFeed.jsx";
-import JobStudio from "./features/RecruiterPortal/Pages/JobStudio.jsx";
-import CompanyProfile from "./features/RecruiterPortal/Pages/CompanyProfile.jsx";
-import RecruitPipeline from "./features/RecruiterPortal/Pages/RecruitPipeline.jsx";
-import AllJobFeed from "./Shared/AllJobFeed.jsx";
+const CandidateDashBoard = lazy(()=>import("./features/Candidate/CandidateDashBoard.jsx"))
+const RecruiterDashBoard = lazy(()=>import("./features/RecruiterPortal/Pages/RecruiterDashBoard.jsx"))
+const OnBoardCompany = lazy(()=>import("./features/RecruiterPortal/Pages/OnBoardCompany.jsx"))
+const JobFeed = lazy(()=>import("./features/RecruiterPortal/Pages/JobFeed.jsx"))
+const JobStudio = lazy(()=>import("./features/RecruiterPortal/Pages/JobStudio.jsx"))
+const CompanyProfile = lazy(()=>import("./features/RecruiterPortal/Pages/CompanyProfile.jsx"))
+const RecruitPipeline = lazy(()=>import("./features/RecruiterPortal/Pages/RecruitPipeline.jsx"))
+const AllJobFeed = lazy(()=>import("./Shared/AllJobFeed.jsx"))
 
 const Login = lazy(()=>import("./features/Auth/pages/Login.jsx"))
 const Register = lazy(()=>import("./features/Auth/pages/Register.jsx"))
