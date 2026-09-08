@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../Auth/Hooks/useAuth";
 import { Briefcase, Building2, Cpu, FileSearchCorner, FileUser, LayersPlus, NotebookPen, Rss, Sparkles, SquareKanban, User, Users } from "lucide-react";
-import NotificationBell from "../Notifications/Components/NotificationBell";
+
+const NotificationBell = lazy(() => import("../Notifications/Components/NotificationBell"));
 
 
 const candidateNavLinks = [
@@ -80,7 +81,9 @@ const Navbar = () => {
         <div className="hidden lg:flex items-center gap-4 shrink-0">
           {user ? (
             <>
-              <NotificationBell />
+              <Suspense fallback={null}>
+                <NotificationBell />
+              </Suspense>
               <button
                 onClick={() => navigate("/profile")}
                 className="rounded-xl border border-line px-4 py-2 text-lg text-muted font-sans
@@ -103,7 +106,9 @@ const Navbar = () => {
 
         {/* ── Hamburger button — visible on mobile/tablet only ── */}
        <div className="lg:hidden flex gap-3 items-center" >
-        <NotificationBell/>
+        <Suspense fallback={null}>
+          <NotificationBell/>
+        </Suspense>
          <button
           onClick={() => setMenuOpen((prev) => !prev)}
           className=" flex flex-col justify-center items-center gap-1.5 w-8 h-8 cursor-pointer"
