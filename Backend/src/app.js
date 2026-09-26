@@ -30,6 +30,8 @@ app.use(cors({
 
 //for ping
 app.get("/ping", (req, res) => {
+  console.log("Ping..");
+  
    res.send("Backend works");
 });
 //auth Router
