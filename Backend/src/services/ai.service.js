@@ -1,8 +1,7 @@
-import dotenv, { parse } from "dotenv";
+import dotenv from "dotenv";
 dotenv.config();
 import Groq from "groq-sdk";
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+
 import {
   interviewReportGroqSchema,
   interviewReportSchema,
@@ -18,11 +17,60 @@ import {
   jobDescriptionGroqSchema,
   jobDescriptionSchema,
 } from "../Schemas/jobDescriptionSchema.js";
-import { json } from "express";
 
 const ai = new Groq({
   apiKey: process.env.GROK_API_KEY,
+  maxRetries: 2,
 });
+
+const callStructured = async ({
+  name,
+  systemPrompt,
+  userPrompt,
+  groqSchema,
+  zodSchema,
+  temperature,
+  maxTokens,
+}) => {
+  const response = await ai.chat.completions.create({
+    model: process.env.GROK_MODEL,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    response_format: {
+      type: "json_schema",
+      json_schema: { name, strict: true, schema: groqSchema },
+    },
+    temperature,
+    max_completion_tokens: maxTokens,
+  });
+
+  const choice = response.choices[0];
+  if (choice.finish_reason === "length") {
+    throw new ApiError(
+      502,
+      `AI response for ${name} was cut off (token limit reached)`,
+    );
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(choice.message.content);
+  } catch (error) {
+    throw new ApiError(502, `AI returned invalid JSON for ${name}`);
+  }
+
+  const result = zodSchema.safeParse(parsed);
+  if (!result.success) {
+    console.error(`[${name}] schema validation failed:`, result.error.issues);
+    throw new ApiError(
+      502,
+      `AI response for ${name} did not match the expected schema`,
+    );
+  }
+  return result.data;
+};
 
 /**
  * @name generateInterviewReport
@@ -52,50 +100,16 @@ Based on the above information, generate:
 4. Any skill gaps in the candidate's profile, sort them from high to low
 5. A concrete 7 day, day-wise preparation plan to help the candidate succeed in the interview, while designing the roadmap give 60% focus on closing the skill gaps as much as possible and 40% focus on the overall tech stack, system design, DSA, OOP, Aptitude `;
 
-  try {
-    const response = await ai.chat.completions.create({
-      model: process.env.GROK_MODEL,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an interview coach. Always respond with valid JSON only. Never use markdown or code fences. if self description is given use that if not then use the resume text to get information about the self description",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "interview_report",
-          strict: true,
-          schema: interviewReportGroqSchema,
-        },
-      },
-      temperature: 0.7,
-      max_tokens: 2000,
-    });
-    // console.log("response => ",response.choices[0].message.content);
-
-    let parsed;
-    try {
-      parsed = JSON.parse(response.choices[0].message.content);
-    } catch (error) {
-      throw new ApiError(501, "AI validation failed");
-    }
-    const validated = interviewReportSchema.parse(parsed);
-
-    return validated;
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.error("Response validation failed:", error.errors);
-      throw new Error("AI response did not match the expected schema");
-    }
-    console.error("Error generating interview report:", error);
-    throw error;
-  }
+  return callStructured({
+    name: "interview_report",
+    systemPrompt:
+      "You are an interview coach. Always respond with valid JSON only. Never use markdown or code fences. if self description is given use that if not then use the resume text to get information about the self description",
+    userPrompt: prompt,
+    groqSchema: interviewReportGroqSchema,
+    zodSchema: interviewReportSchema,
+    temperature: 0.2,
+    maxTokens: 3000,
+  });
 };
 
 /**
@@ -366,49 +380,16 @@ ${project.description}
     : "No projects provided"
 }
 `;
-  try {
-    const response = await ai.chat.completions.create({
-      model: process.env.GROK_MODEL,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an interview coach. Always respond with valid JSON only. Never use markdown or code fences.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "resume",
-          schema: resumeGroqSchema,
-          strict: true,
-        },
-      },
-      temperature: 0.7,
-      max_tokens: 2500,
-    });
-
-    let parsed;
-    try {
-      parsed = JSON.parse(response.choices[0].message.content);
-    } catch (error) {
-      throw new ApiError(501, "AI validation failed");
-    }
-    const validated = ResumeReportSchema.parse(parsed);
-
-    return validated;
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.error("Response validation failed:", error);
-      throw new Error("AI response did not match the expected schema");
-    }
-    console.error("Error generating interview report:", error);
-    throw error;
-  }
+  return callStructured({
+    name: "generate_resume",
+    systemPrompt:
+      "You are an interview coach. Always respond with valid JSON only. Never use markdown or code fences.",
+    userPrompt: prompt,
+    groqSchema: resumeGroqSchema,
+    zodSchema: ResumeReportSchema,
+    temperature: 0.5,
+    maxTokens: 2500,
+  });
 };
 
 /**
@@ -493,60 +474,23 @@ Important Guidelines:
 - Never present projects, coursework, or certifications as if they were professional experience — evaluate them separately and label them accurately.
 `;
 
-  try {
-    const response = await ai.chat.completions.create({
-      model: process.env.GROK_MODEL,
-      messages: [
-        {
-          role: "system",
-          content: `
-You are an expert technical recruiter.
+  return callStructured({
+    name: "recruiter_report",
+    systemPrompt: `You are an expert technical recruiter.
 
 Analyze candidates against job requirements.
 
 Return ONLY valid JSON.
 Follow the exact field names from the provided JSON schema.
 Do not rename keys.
-Do not add extra fields.
-`,
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "recruiter_report",
-          strict: true,
-          schema: recruiterReportGroqSchema,
-        },
-      },
-      temperature: 0.7,
-      max_tokens: 2000,
-    });
-    // console.log("response => ", response.choices[0].message.content);
+Do not add extra fields.`,
+userPrompt:prompt,
+groqSchema:recruiterReportGroqSchema,
+zodSchema:recruiterReportSchema,
+temperature:0.2,
+maxTokens:2000
+  });
 
-    let parsed;
-    try {
-      parsed = JSON.parse(response.choices[0].message.content);
-      console.log("rc ==>", parsed);
-      
-    } catch (error) {
-      throw new ApiError(501, "AI validation failed");
-    }
-    const validated = recruiterReportSchema.parse(parsed);
-
-    return validated;
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.error("Response validation failed:", error.errors);
-      throw new Error("AI response did not match the expected schema");
-    }
-    console.error("Error generating interview report:", error);
-    throw error;
-  }
 };
 /**
  * @name generateJobDescription
@@ -598,13 +542,9 @@ Requirements:
 - End with a professional call-to-action encouraging qualified candidates to apply.
 - Return only the JSON object that matches the provided schema.
 `;
-  try {
-    const response = await ai.chat.completions.create({
-      model: process.env.GROK_MODEL,
-      messages: [
-        {
-          role: "system",
-          content: `
+return callStructured({
+  name:"job_description",
+  systemPrompt:`
         You are a senior technical recruiter and HR specialist.
 
 Your task is to generate a professional, realistic, and ATS-friendly job description suitable for publication on a modern job portal.
@@ -641,45 +581,13 @@ Guidelines:
 - Keep each section heading on its own line.
 - Do not use markdown formatting such as #, **, -, or bullet symbols for section headings.
         `,
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "job_description",
-          strict: true,
-          schema: jobDescriptionGroqSchema,
-        },
-      },
-      temperature: 0.7,
-      max_tokens: 2000,
-    });
-
-    let parsed;
-    try {
-      parsed = JSON.parse(response.choices[0].message.content);
-      
-      
-    } catch (error) {
-      throw new ApiError(501, "AI validation failed");
-    }
-    const validated = jobDescriptionSchema.parse(parsed);
-    
-    
-    return validated;
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.error("Response validation failed", error.errors);
-      throw new Error("AI response did not match the expected schema");
-    }
-    console.error("Error generating interview report: ", error);
-    throw error;
-  }
+    userPrompt:prompt,
+    groqSchema:jobDescriptionGroqSchema,
+    zodSchema:jobDescriptionSchema,
+    temperature:0.5,
+    maxTokens:2000
+})
+  
 };
 
 /**
@@ -754,14 +662,9 @@ Each day should contain:
 
 Only provide information that is relevant to this candidate and this job role.
 `;
-
-  try {
-    const response = await ai.chat.completions.create({
-      model: process.env.GROK_MODEL,
-      messages: [
-        {
-          role: "system",
-          content: `
+return callStructured({
+  name:"analyze_prep_report",
+  systemPrompt: `
 You are an expert technical interviewer and career coach.
 
 Your task is to evaluate candidates against job descriptions and create actionable interview preparation plans.
@@ -774,42 +677,11 @@ Important rules:
 - Be realistic and avoid giving inflated scores.
 - Prioritize practical interview preparation over generic advice.
           `,
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "interview_report",
-          strict: true,
-          schema: interviewReportGroqSchema,
-        },
-      },
-      temperature: 0.5,
-      max_tokens: 3000,
-    });
-
-    let parsed;
-
-    try {
-      parsed = JSON.parse(response.choices[0].message.content);
-    } catch (error) {
-      throw new ApiError(501, "AI validation failed");
-    }
-
-    const validated = interviewReportSchema.parse(parsed);
-
-    return validated;
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      console.error("Response validation failed:", error.errors);
-      throw new Error("AI response did not match the expected schema");
-    }
-
-    console.error("Error generating interview report:", error);
-    throw error;
-  }
+  userPrompt:prompt,
+  groqSchema:interviewReportGroqSchema,
+  zodSchema:interviewReportSchema,
+  temperature:0.2,
+  maxTokens:3000
+})
+  
 };

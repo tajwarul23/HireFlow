@@ -134,7 +134,7 @@ export const resumeGroqSchema = {
       properties: {
         degree: { type: "string" },
         institution: { type: "string" },
-        result: { type: ["string", "null"] },
+        result: { type: "string" },
       },
       required: ["degree", "institution", "result"],
        additionalProperties: false,
