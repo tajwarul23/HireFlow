@@ -34,12 +34,22 @@ export const applyToJobController = asyncHandler(async (req, res) => {
   }
 
   const job = await JobModel.findById(jobId).select(
-    "_id company description skills title",
+    "_id company description skills title status deadline",
   );
 
   if (!job) {
     throw new ApiError(404, "No job found");
   }
+
+  if(job.status !== "OPEN"){
+    throw new ApiError(400, "You can only apply to an open job");
+  }
+
+    if (job.deadline && job.deadline < new Date()) {
+    throw new ApiError(400, "The application deadline for this job has passed");
+  }
+
+  
 
   const resume = await resumeResolveForRequest(req);
 
@@ -69,30 +79,38 @@ export const applyToJobController = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, application, "Applied to job successfully"));
 
   //send notification to the company_admin and recruiter
-  const recipients = await userModel.find({company:job.company, role:{$in:["recruiter", "company_admin"]}}).select("_id");
+ // Background work after the response. Both tasks run at the same time and
+  // each one handles its own errors, so one failing can't stop the other.
+  const notifyRecruiters = async () => {
+    const recipients = await userModel
+      .find({ company: job.company, role: { $in: ["recruiter", "company_admin"] } })
+      .select("_id");
 
-  if(recipients.length > 0){
-    await NotificationModel.insertMany(
-      recipients.map((r)=>({
-        recipient: r._id,
-        type: "NEW_APPLICATION",
-        message:`${req.user.userName} applied for ${job.title}`,
-        title:"New Application Received"
+    if (recipients.length > 0) {
+      await NotificationModel.insertMany(
+        recipients.map((r) => ({
+          recipient: r._id,
+          type: "NEW_APPLICATION",
+          message: `${req.user.userName} applied for ${job.title}`,
+          title: "New Application Received",
+        })),
+      );
+    }
+  };
 
-      }))
-    )
-  }
+  const createRecruiterReport = async () => {
+    try {
+      const recruiterReport = await generateRecruiterReport(
+        resume.rawText,
+        job.description,
+        job.skills,
+      );
 
-
-  // Generate report asynchronously
-  generateRecruiterReport(resume.rawText, job.description, job.skills)
-    .then(async (recruiterReport) => {
       const report = await RecruiterReportModel.create({
         candidate: req.user.id,
         job: job._id,
         application: application._id,
         resume: resume._id,
-
         ...recruiterReport,
       });
 
@@ -101,17 +119,23 @@ export const applyToJobController = asyncHandler(async (req, res) => {
         recruiterReportStatus: "generated",
         matchScore: report.matchScore,
       });
-
-      // console.log("Generated recruiter report", report);
-    })
-    .catch(async (error) => {
+    } catch (error) {
       console.error("Recruiter report generation failed:", error.message);
+      // Mark it failed so the UI stops showing "Scoring…". If even this update fails,
+      // swallow it: an unhandled error here would crash the server.
+      await applicationModel
+        .findByIdAndUpdate(application._id, { recruiterReportStatus: "failed" })
+        .catch(() => {});
+    }
+  };
 
-      await applicationModel.findByIdAndUpdate(application._id, {
-        recruiterReportStatus: "failed",
-      });
-    });
-});
+  const results = await Promise.allSettled([notifyRecruiters(), createRecruiterReport()]);
+  results.forEach((result) => {
+    if (result.status === "rejected") {
+      console.error("Background task after apply failed:", result.reason?.message);
+    }
+  });
+})
 
 /**
  * @name getCandidateAllApplicationController
