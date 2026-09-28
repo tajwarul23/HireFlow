@@ -24,10 +24,21 @@ export const createResume = async (req, res) => {
 
     const userName = resumeData?.fullName;
 
-    const [resumeByAi, warmPage] = await Promise.all([
+      // Run both at once, but if either one fails, still close the Chrome tab.
+    const [aiResult, pageResult] = await Promise.allSettled([
       generateResume(resumeData),
       warmUpPage(),
     ]);
+
+    if (aiResult.status === "rejected" || pageResult.status === "rejected") {
+      if (pageResult.status === "fulfilled") {
+        await pageResult.value.close().catch(() => {});
+      }
+      throw aiResult.status === "rejected" ? aiResult.reason : pageResult.reason;
+    }
+
+    const resumeByAi = aiResult.value;
+    const warmPage = pageResult.value;
 
     if (!resumeByAi) {
       await warmPage.close();

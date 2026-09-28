@@ -33,10 +33,11 @@ const getBrowser = async () => {
           headless: chromium.headless,
         }
       : {
-          executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+          executablePath:
+            "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
           headless: true,
           args: ["--no-sandbox"],
-        }
+        },
   );
 
   pdfsGeneratedSinceRestart = 0;
@@ -49,32 +50,27 @@ const getBrowser = async () => {
   return browserInstance;
 };
 
-// FIX 1 — Warm up a page and return it WITHOUT closing
-// Called in parallel with Gemini so the page is ready when AI finishes
 export const warmUpPage = async () => {
   const browser = await getBrowser();
   const page = await browser.newPage();
   // Set viewport early — one less thing to do later
   await page.setViewport({ width: 794, height: 1123 });
+  // Safety net: the resume is plain HTML/CSS, so scripts never need to run
+  // and the page never needs to load anything from the internet.
+  await page.setJavaScriptEnabled(false);
+  await page.setRequestInterception(true);
+  page.on("request", (request) => request.abort());
   return page; // caller is responsible for closing this page
 };
 
-// FIX 1 — Accepts an already-warm page instead of creating one internally
-// FIX 2 — pdf() and screenshot() run in parallel via Promise.all
-// FIX 5 — domcontentloaded instead of networkidle0
 export const generatePDFFromPage = async (page, html) => {
   try {
-    // FIX 5: domcontentloaded fires as soon as HTML/CSS is parsed.
-    // Safe as long as your resume HTML has no external image URLs or <link> font imports.
-    // If you have Google Fonts or remote images, embed them as base64 instead.
     await page.setContent(html, { waitUntil: "domcontentloaded" });
 
-    // FIX 2: Both operations work on the same already-rendered page.
-    // No reason to wait for pdf() before starting screenshot() — run together.
     const [pdfBuffer, thumbnailBuffer] = await Promise.all([
       page.pdf({
         format: "A4",
-        printBackground: true, // without this, CSS background colors are stripped in PDF
+        printBackground: true,
       }),
       page.screenshot({
         type: "jpeg",
@@ -90,6 +86,3 @@ export const generatePDFFromPage = async (page, html) => {
     await page.close();
   }
 };
-
-
-

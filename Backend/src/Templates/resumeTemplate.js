@@ -1,10 +1,23 @@
+const esc = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const safeUrl = (value) => {
+  const url = String(value ?? "").trim();
+  return /^https?:\/\//i.test(url) ? esc(url) : "";
+};
+
 const resumeTemplate = (data) => {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>${data.fullName} — Resume</title>
+<title>${esc(data.fullName)} — Resume</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -99,112 +112,167 @@ const resumeTemplate = (data) => {
 
 <!-- ══ HEADER ══════════════════════════════════════════════ -->
 <div class="header">
-  <h1>${data.fullName}</h1>
+  <h1>${esc(data.fullName)}</h1>
   <div class="contact-row">
-    <span>${data.email}</span>
-    <span>${data.phone}</span>
-    <span>${data.location}</span>
-    ${data.linkedinUrl ? `<span><a href="${data.linkedinUrl}">LinkedIn</a></span>` : ""}
-    ${data.githubProfileLink ? `<span><a href="${data.githubProfileLink}">GitHub</a></span>` : ""}
-    ${data.portfolioUrl ? `<span><a href="${data.portfolioUrl}">Portfolio</a></span>` : ""}
+    <span>${esc(data.email)}</span>
+    <span>${esc(data.phone)}</span>
+    <span>${esc(data.location)}</span>
+    ${safeUrl(data.linkedinUrl) ? `<span><a href="${safeUrl(data.linkedinUrl)}">LinkedIn</a></span>` : ""}
+    ${safeUrl(data.githubProfileLink) ? `<span><a href="${safeUrl(data.githubProfileLink)}">GitHub</a></span>` : ""}
+    ${safeUrl(data.portfolioUrl) ? `<span><a href="${safeUrl(data.portfolioUrl)}">Portfolio</a></span>` : ""}
   </div>
 </div>
 
 <!-- ══ SUMMARY ══════════════════════════════════════════════ -->
-${data.summary ? `
+${
+  data.summary
+    ? `
 <div class="section summary">
   <div class="section-title">Professional Summary</div>
-  <p>${data.summary}</p>
-</div>` : ""}
+  <p>${esc(data.summary)}</p>
+</div>`
+    : ""
+}
 
 <!-- ══ EXPERIENCE ═══════════════════════════════════════════ -->
-${data.experiences && data.experiences.length > 0 ? `
+${
+  data.experiences && data.experiences.length > 0
+    ? `
 <div class="section">
   <div class="section-title">Work Experience</div>
-  ${data.experiences.map(exp => `
+  ${data.experiences
+    .map(
+      (exp) => `
   <div class="entry">
     <div class="entry-header">
       <div>
-        <div class="entry-title">${exp.jobTitle}</div>
-        <div class="entry-sub">${exp.company}${exp.expLocation ? ` &nbsp;·&nbsp; ${exp.expLocation}` : ""}</div>
+        <div class="entry-title">${esc(exp.jobTitle)}</div>
+        <div class="entry-sub">${esc(exp.company)}${exp.expLocation ? ` &nbsp;·&nbsp; ${esc(exp.expLocation)}` : ""}</div>
       </div>
-      <div class="entry-meta">${exp.duration}</div>
+      <div class="entry-meta">${esc(exp.duration)}</div>
     </div>
-    ${exp.achievements ? `
+    ${
+      exp.achievements
+        ? `
     <ul>
       ${(Array.isArray(exp.achievements)
         ? exp.achievements
-        : exp.achievements.split(/\n|•/).map(a => a.trim()).filter(Boolean)
-      ).map(a => `<li>${a}</li>`).join("")}
-    </ul>` : ""}
-  </div>`).join("")}
-</div>` : ""}
+        : exp.achievements
+            .split(/\n|•/)
+            .map((a) => a.trim())
+            .filter(Boolean)
+      )
+        .map((a) => `<li>${esc(a)}</li>`)
+        .join("")}
+    </ul>`
+        : ""
+    }
+  </div>`,
+    )
+    .join("")}
+</div>`
+    : ""
+}
 
 <!-- ══ EDUCATION ════════════════════════════════════════════ -->
 
-${data.education && data.education.length > 0 ? `
+${
+  data.education && data.education.length > 0
+    ? `
 <div class="section">
   <div class="section-title">Education</div>
-  ${data?.education?.map(edu => `
+  ${data?.education
+    ?.map(
+      (edu) => `
   <div class="edu-entry">
     <div class="entry-header">
       <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
         <div>
-          <div class="entry-title">${edu?.degree}</div>
-          <div class="entry-sub">${edu?.institution}</div>
+          <div class="entry-title">${esc(edu?.degree)}</div>
+          <div class="entry-sub">${esc(edu?.institution)}</div>
         </div>
-        ${edu?.result ? `<div class="entry-sub">${edu?.result}</div>` : ""}
+        ${edu?.result ? `<div class="entry-sub">${esc(edu.result)}</div>` : ""}
       </div>
     </div>
-  </div>`).join("")}
-</div>` : ""}
+  </div>`,
+    )
+    .join("")}
+</div>`
+    : ""
+}
 
 <!-- ══ SKILLS ═══════════════════════════════════════════════ -->
-${data.skills && data.skills.length > 0 ? `
+${
+  data.skills && data.skills.length > 0
+    ? `
 <div class="section">
   <div class="section-title">Skills</div>
   <div class="skills-grid">
-    ${data.skills.map(skill => `
+    ${data.skills
+      .map(
+        (skill) => `
     <div class="skill-row">
-      <span class="skill-name">${skill.name}</span>
-      <span class="skill-desc">${skill.description}</span>
-    </div>`).join("")}
+      <span class="skill-name">${esc(skill.name)}</span>
+      <span class="skill-desc">${esc(skill.description)}</span>
+    </div>`,
+      )
+      .join("")}
   </div>
-</div>` : ""}
+</div>`
+    : ""
+}
 
 <!-- ══ PROJECTS ══════════════════════════════════════════════ -->
-${data.projects && data.projects.length > 0 ? `
+${
+  data.projects && data.projects.length > 0
+    ? `
 <div class="section">
   <div class="section-title">Projects</div>
-  ${data.projects.map(proj => `
+  ${data.projects
+    .map(
+      (proj) => `
   <div class="project-entry">
     <div class="project-header">
-      <span class="project-name">${proj.name}</span>
+      <span class="project-name">${esc(proj.name)}</span>
       <span class="project-links">
-        ${proj.githubLink ? `<a href="${proj.githubLink}">GitHub</a>` : ""}
-        ${proj.liveLink ? `<a href="${proj.liveLink}">Live</a>` : ""}
+        ${safeUrl(proj.githubLink) ? `<a href="${safeUrl(proj.githubLink)}">GitHub</a>` : ""}
+        ${safeUrl(proj.liveLink) ? `<a href="${safeUrl(proj.liveLink)}">Live</a>` : ""}
       </span>
     </div>
-    <p class="project-desc">${proj.description}</p>
-  </div>`).join("")}
-</div>` : ""}
+    <p class="project-desc">${esc(proj.description)}</p>
+  </div>`,
+    )
+    .join("")}
+</div>`
+    : ""
+}
 
 <!-- ══ CERTIFICATIONS ════════════════════════════════════════ -->
-${data.certifications && data.certifications.length > 0 ? `
+${
+  data.certifications && data.certifications.length > 0
+    ? `
 <div class="section">
   <div class="section-title">Certifications</div>
-  ${data.certifications.map(cert => `
+  ${data.certifications
+    .map(
+      (cert) => `
   <div class="cert-entry">
     <div class="cert-header">
-      <span class="cert-name">${cert.name}</span>
-      <span class="cert-date">${cert.issueDate}</span>
+      <span class="cert-name">${esc(cert.name)}</span>
+      <span class="cert-date">${esc(cert.issueDate)}</span>
     </div>
-    <div class="cert-issuer">${ cert.issuer}</div>
-    ${cert.credentialUrl
-      ? `<div class="cert-url"><a href="${cert.credentialUrl}">View Credential</a></div>`
-      : ""}
-  </div>`).join("")}
-</div>` : ""}
+    <div class="cert-issuer">${esc(cert.issuer)}</div>
+    ${
+      safeUrl(cert.credentialUrl)
+        ? `<div class="cert-url"><a href="${safeUrl(cert.credentialUrl)}">View Credential</a></div>`
+        : ""
+    }
+  </div>`,
+    )
+    .join("")}
+</div>`
+    : ""
+}
 
 </body>
 </html>`;
