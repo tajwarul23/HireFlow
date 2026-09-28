@@ -6,6 +6,7 @@ import {
   getAllResume,
   getResumeById,
 } from "../Controllers/resume.controller.js";
+import { aiLimiter } from "../Middlewares/rateLimit.middleware.js";
 
 const resumeRouter = express.Router();
 
@@ -15,7 +16,7 @@ const resumeRouter = express.Router();
  * @access Private
  */
 
-resumeRouter.post("/", verifyToken, createResume);
+resumeRouter.post("/", verifyToken, aiLimiter, createResume);
 
 /**
  * @route GET /api/resume/

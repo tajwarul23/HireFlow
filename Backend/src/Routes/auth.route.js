@@ -1,6 +1,7 @@
 import express from "express";
 import { getMeController, loginUserController, logoutUserController, registerUserController,  firebaseAuthController, becomeCandidateController } from "../Controllers/Auth.controller.js";
 import { verifyToken, authorizeRoles } from "../Middlewares/Auth.middleware.js";
+import { googleAuthLimiter, loginLimiter, registerLimiter } from "../Middlewares/rateLimit.middleware.js";
 const authRouter = express.Router();
 
 /**
@@ -8,13 +9,13 @@ const authRouter = express.Router();
  * @description Register a new user
  * @access Public
  */
-authRouter.post("/register", registerUserController )
+authRouter.post("/register",registerLimiter, registerUserController )
 /**
  * @route POST /api/auth/login
  * @description Login a  user
  * @access Public
  */
-authRouter.post("/login", loginUserController )
+authRouter.post("/login", loginLimiter, loginUserController )
 
 /**
  * @route POST /api/auth/logout
@@ -37,7 +38,7 @@ authRouter.get("/get-me",verifyToken,getMeController)
  * @description firebase authentication
  * @access Public
  */
-authRouter.post("/firebase", firebaseAuthController);
+authRouter.post("/firebase",googleAuthLimiter, firebaseAuthController);
 
 /**
  * @route POST /api/auth/become-candidate

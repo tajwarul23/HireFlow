@@ -2,6 +2,7 @@ import express from "express";
 import { aboutCompanyController, createCompanyController, generateInviteController, getCompanyController, inviteByEmailController, joinCompanyController, leaveCompanyController, removeEmployeeController, updateCompanyController, updateCompanyLogoController } from "../Controllers/Company.controller.js";
 import { authorizeRoles, verifyToken } from "../Middlewares/Auth.middleware.js";
 import upload from "../Middlewares/File.middleware.js";
+import { inviteEmailLimiter, uploadLimiter } from "../Middlewares/rateLimit.middleware.js";
 
 const companyRouter = express.Router();
 
@@ -10,7 +11,7 @@ const companyRouter = express.Router();
  * @description Create a new company
  * @access Private
  */
-companyRouter.post("/create", verifyToken, upload.single("logo"), createCompanyController )
+companyRouter.post("/create", verifyToken, uploadLimiter, upload.single("logo"), createCompanyController )
 /**
  * @route POST /api/company/join
  * @description Join a  company
@@ -29,7 +30,7 @@ companyRouter.post("/invite", verifyToken, authorizeRoles("company_admin"), gene
  * @description generate an invite link and email it directly to a recruiter
  * @access Private [only company admin]
  */
-companyRouter.post("/invite-email", verifyToken, authorizeRoles("company_admin"), inviteByEmailController)
+companyRouter.post("/invite-email", verifyToken, authorizeRoles("company_admin"),inviteEmailLimiter, inviteByEmailController)
 
 /**
  * @route POST /api/company/update
@@ -42,7 +43,7 @@ companyRouter.patch("/update", verifyToken, authorizeRoles("company_admin"), upd
  * @description update company logo
  * @access Private [only company admin]
  */
-companyRouter.patch("/updateLogo", verifyToken, authorizeRoles("company_admin"),upload.single("logo"), updateCompanyLogoController)
+companyRouter.patch("/updateLogo", verifyToken, authorizeRoles("company_admin"), uploadLimiter, upload.single("logo"), updateCompanyLogoController)
 
 /**
  * @route GET /api/company/

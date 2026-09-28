@@ -6,6 +6,7 @@ import {
   getAllInterviewReportController,
 } from "../Controllers/Interview.controller.js";
 import upload from "../Middlewares/File.middleware.js";
+import { aiLimiter } from "../Middlewares/rateLimit.middleware.js";
 
 const interviewRouter = express.Router();
 
@@ -18,6 +19,7 @@ const interviewRouter = express.Router();
 interviewRouter.post(
   "/",
   verifyToken,
+  aiLimiter,
   upload.single("resume"),
   generateInterviewReportController,
 );

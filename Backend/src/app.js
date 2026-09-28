@@ -11,6 +11,8 @@ import notificationRouter from "./Routes/notification.route.js";
 import compression from "compression"
 const app = express();
 
+
+app.set("trust proxy", 1);
 app.use(compression())
 
 app.use((req, res, next) => {

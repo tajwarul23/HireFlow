@@ -3,6 +3,7 @@ import { authorizeRoles, verifyToken } from "../Middlewares/Auth.middleware.js";
 import upload from "../Middlewares/File.middleware.js";
 import { analyzePrepController, applyToJobController, getCandidateApplicationsController, getCompanyApplicationsController, updateApplicationJobStatusController } from "../Controllers/Application.controller.js";
 import { requireCompanyScope } from "../Middlewares/Role.middleware.js";
+import { aiLimiter, applyLimiter } from "../Middlewares/rateLimit.middleware.js";
 
 const applicationRouter = express.Router();
 
@@ -12,7 +13,7 @@ const applicationRouter = express.Router();
  * @access Private [candidate only]
  */
 
-applicationRouter.post("/:jobId", verifyToken, authorizeRoles("candidate"), upload.single("resume"), applyToJobController)
+applicationRouter.post("/:jobId", verifyToken, authorizeRoles("candidate"), applyLimiter, upload.single("resume"), applyToJobController)
 
 /**
  * @route GET /api/application/
@@ -42,7 +43,7 @@ applicationRouter.patch("/:applicationId", verifyToken, authorizeRoles("company_
  * @description generate report for analyze&prep
  * @access Private ["candidate"]
  */
-applicationRouter.post("/analyze/:jobId", verifyToken, authorizeRoles("candidate"), upload.single("resume"), analyzePrepController)
+applicationRouter.post("/analyze/:jobId", verifyToken, authorizeRoles("candidate"),aiLimiter, upload.single("resume"), analyzePrepController)
 
 
 export default applicationRouter;

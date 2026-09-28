@@ -1,4 +1,4 @@
-import { applicationModel } from "../Models/application.model.js";
+ import { applicationModel } from "../Models/application.model.js";
 import { CompanyModel } from "../Models/company.model.js";
 import { JobModel } from "../Models/job.model.js";
 import { userModel } from "../Models/user.model.js";
@@ -13,23 +13,31 @@ import jwt from "jsonwebtoken";
 import { sendCompanyInviteEmail } from "../services/email.service.js";
 import { createNotification } from "../services/createNotification.js";
 import mongoose from "mongoose";
+import crypto from "node:crypto";
+import { InviteModel } from "../Models/invite.model.js";
 
-const buildInviteLink = (companyId) => {
-  const inviteToken = jwt.sign(
-    {
-      companyId,
-      type: "company_invite",
-    },
-    process.env.INVITATION_TOKEN_SECRET,
-    { expiresIn: "1d" },
-  );
+const INVITE_LIFETIME_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+const hashToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
+
+// Saves a one-time invite in the database and returns the link that carries its token.
+const createInviteLink = async ({ companyId, createdBy, email = null }) => {
+  const token = crypto.randomBytes(32).toString("hex");
+
+  await InviteModel.create({
+    company: companyId,
+    createdBy,
+    email,
+    tokenHash: hashToken(token),
+    expiresAt: new Date(Date.now() + INVITE_LIFETIME_MS),
+  });
 
   const clientUrl =
     process.env.NODE_ENV === "production"
       ? "https://hireflow-dev.vercel.app"
       : "http://localhost:5173";
 
-  return `${clientUrl}/onboarding/company?token=${inviteToken}`;
+  return `${clientUrl}/onboarding/company?token=${token}`;
 };
 /**
  * @name createCompanyController
@@ -108,7 +116,10 @@ export const createCompanyController = asyncHandler(async (req, res) => {
  * @access Private (company_admin)
  */
 export const generateInviteController = asyncHandler(async (req, res) => {
-  const inviteLink = buildInviteLink(req.user.company);
+  const inviteLink = await createInviteLink({
+    companyId: req.user.company,
+    createdBy: req.user._id,
+  });
 
   return res
     .status(200)
@@ -126,7 +137,11 @@ export const inviteByEmailController = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Email is required");
   }
 
-  const inviteLink = buildInviteLink(req.user.company);
+  const inviteLink = await createInviteLink({
+    companyId: req.user.company,
+    createdBy: req.user._id,
+    email: email.trim(),
+  });
 
   await sendCompanyInviteEmail({
     to: email.trim(),
@@ -148,42 +163,38 @@ export const inviteByEmailController = asyncHandler(async (req, res) => {
 export const joinCompanyController = asyncHandler(async (req, res) => {
   const { token } = req.query;
   if (!token) throw new ApiError(400, "Invite token is required");
-  let decoded = jwt.verify(token, process.env.INVITATION_TOKEN_SECRET);
-  if (!decoded) throw new ApiError(400, "Invalid or expired invite link");
-  if (decoded.type !== "company_invite")
-    throw new ApiError(400, "Invalid invite token");
 
-  const company = await CompanyModel.findById(decoded.companyId);
+  const invite = await InviteModel.findOne({ tokenHash: hashToken(String(token)) });
+  if (!invite) throw new ApiError(400, "Invalid invite link");
+  if (invite.usedAt) throw new ApiError(400, "This invite link has already been used");
+  if (invite.expiresAt < new Date()) throw new ApiError(400, "This invite link has expired");
+
+  const company = await CompanyModel.findById(invite.company);
   if (!company) throw new ApiError(404, "Company not found");
 
-  if (
-    req.user.company &&
-    req.user.company.toString() !== company._id.toString()
-  ) {
-    throw new ApiError(400, "You are already associated with a company.");
-  }
-
-  const updatedUser = await userModel.findOneAndUpdate(
-    { _id: req.user.id, company: { $ne: company._id } },
-    {
-      role: "recruiter",
-      company: company._id,
-      joinedAt: new Date(),
-    },
-    { new: true },
-  );
-
-  if (!updatedUser) {
+  if (req.user.company) {
+    if (String(req.user.company) !== String(company._id)) {
+      throw new ApiError(400, "You are already associated with a company.");
+    }
+    // Already a member: don't use up the invite, so it can still go to someone else.
     return res
       .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          req.user,
-          `Already a member of ${company.companyName}`,
-        ),
-      );
+      .json(new ApiResponse(200, req.user, `Already a member of ${company.companyName}`));
   }
+
+  // Use up the invite. The "usedAt: null" condition means that if two people
+  // open the same link at the same moment, only one of them gets in.
+  const claimed = await InviteModel.findOneAndUpdate(
+    { _id: invite._id, usedAt: null },
+    { usedAt: new Date(), usedBy: req.user._id },
+  );
+  if (!claimed) throw new ApiError(400, "This invite link has already been used");
+
+  const updatedUser = await userModel.findByIdAndUpdate(
+    req.user.id,
+    { role: "recruiter", company: company._id, joinedAt: new Date() },
+    { new: true },
+  );
 
   const newToken = jwt.sign(
     {

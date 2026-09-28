@@ -2,6 +2,7 @@ import express from "express";
 import { authorizeRoles, verifyToken } from "../Middlewares/Auth.middleware.js";
 import { createJobController, deleteJobController, generateJobDescriptionController, getCompanyJobFeedController, getJobFeedController, updateJobController } from "../Controllers/Job.controller.js";
 import { requireCompanyScope } from "../Middlewares/Role.middleware.js";
+import { aiLimiter } from "../Middlewares/rateLimit.middleware.js";
 
 
 const jobRouter = express.Router();
@@ -19,7 +20,7 @@ jobRouter.post("/create", verifyToken, authorizeRoles("company_admin", "recruite
  * @description route for ai generated description
  * @access Private [company_admin || recruiter]
  */
-jobRouter.post("/generate-description", verifyToken, authorizeRoles("company_admin", "recruiter"), generateJobDescriptionController)
+jobRouter.post("/generate-description", verifyToken, authorizeRoles("company_admin", "recruiter"), aiLimiter, generateJobDescriptionController)
 
 
 /**
