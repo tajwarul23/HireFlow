@@ -213,12 +213,20 @@ export const getJobFeedController = asyncHandler(async (req, res) => {
 
   //search
   if (q && q.trim()) {
-    const searchTerm = q.trim().replace(/\s+/g, "");
-    query.$text = {
-      $search: searchTerm,
-      $caseSensitive: false,
-      $diacriticSensitive: false,
-    };
+    const words = q
+      .trim()
+      .split(/\s+/)
+      .map((word) => word.replace(/["\\]/g, "")) // quotes/backslashes would break the search string
+      .filter(Boolean)
+      .slice(0, 10); // keep the query small
+
+    if (words.length) {
+      query.$text = {
+        $search: words.map((word) => `"${word}"`).join(" "),
+        $caseSensitive: false,
+        $diacriticSensitive: false,
+      };
+    }
   }
 
   //filters
@@ -400,8 +408,7 @@ export const updateJobController = asyncHandler(async (req, res) => {
       throw new ApiError(400, "Job title cannot be empty");
     }
 
-    // Keep the hidden duplicate-check copy in sync, and block renaming
-    // to a title another job in this company already uses.
+ 
     const normalizedTitle = trimmedTitle.toLowerCase();
     if (normalizedTitle !== req.job.normalizedTitle) {
       const duplicate = await JobModel.exists({
