@@ -279,7 +279,7 @@ const JobCard = ({ job, view }) => {
             .split("\n")
             .filter(Boolean)
             .map((line, index) => {
-              const isHeading = line.trim().includes(":");
+              const isHeading = line.trim().endsWith(":");
               return (
                 <p
                   key={index}

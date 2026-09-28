@@ -1,4 +1,5 @@
 import axios from "axios";
+import { API_URL } from "../../../Config/api.js";
 
 //whenever there is any interaction with the cookie we have to use withCredentials : true
 ////so the browser sends the cookie to server also receives/stores the cookie
@@ -7,14 +8,9 @@ import axios from "axios";
 
 
 const api = axios.create({
-  baseURL: "https://hireflow-r73i.onrender.com",
+  baseURL: API_URL,
   withCredentials: true,
 });
-
-// const api = axios.create({
-//   baseURL: "https://gen-ai-job-preparation-project.onrender.com",
-//   withCredentials: true,
-// });
 
 export const register = async ({ userName, email, password }) => {
   const response = await api.post("/api/auth/register", {

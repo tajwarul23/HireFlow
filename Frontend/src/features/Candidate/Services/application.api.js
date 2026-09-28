@@ -1,7 +1,8 @@
 import axios from "axios";
+import { API_URL } from "../../../Config/api.js";
 
 const api = axios.create({
-  baseURL: "https://hireflow-r73i.onrender.com/api/application",
+  baseURL: `${API_URL}/api/application`,
   withCredentials: true,
 });
 

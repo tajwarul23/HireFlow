@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
+import { API_URL } from "../../../Config/api.js";
 
 // Polls GET /api/resume/:id every 3 seconds until resumeUrl is ready
 const useResumePolling = (resumeId, initialIsSaving) => {
@@ -14,7 +15,7 @@ const useResumePolling = (resumeId, initialIsSaving) => {
 
     intervalRef.current = setInterval(async () => {
       try {
-        const { data } = await axios.get(`https://hireflow-r73i.onrender.com/api/resume/${resumeId}`, {
+        const { data } = await axios.get(`${API_URL}/api/resume/${resumeId}`, {
           withCredentials: true,
         });
 

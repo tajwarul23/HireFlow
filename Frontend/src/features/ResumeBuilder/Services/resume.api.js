@@ -1,11 +1,8 @@
 import axios from "axios";
+import { API_URL } from "../../../Config/api.js";
 
-// const api = axios.create({
-// baseURL: "https://gen-ai-job-preparation-project.onrender.com",
-// withCredentials: true,
-// });
 const api = axios.create({
-  baseURL: "https://hireflow-r73i.onrender.com",
+  baseURL: API_URL,
   withCredentials: true,
 });
 
