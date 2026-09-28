@@ -1,10 +1,11 @@
 import { generateResume } from "../services/ai.service.js";
 import resumeTemplate from "../Templates/resumeTemplate.js";
 import { generatePDFFromPage, warmUpPage } from "../services/generatePDF.js";
-import {uploadPDF} from "../services/uploadPDF.js";
+import { uploadPDF } from "../services/uploadPDF.js";
 import { ResumeModel } from "../Models/resume.model.js";
 import mongoose from "mongoose";
-import {convert} from "html-to-text"
+import { convert } from "html-to-text";
+
 // import { success } from "zod";
 
 /**
@@ -23,31 +24,29 @@ export const createResume = async (req, res) => {
 
     const userName = resumeData?.fullName;
 
-    
     const [resumeByAi, warmPage] = await Promise.all([
       generateResume(resumeData),
       warmUpPage(),
     ]);
-    
-    
-    
-    
+
     if (!resumeByAi) {
-      await warmPage.close(); 
+      await warmPage.close();
       return res.status(500).json({
         message: "Failed to generate resume using AI. Please Try Again.",
         success: false,
       });
     }
 
-    const resumeTitle = resumeByAi.title; 
+    const resumeTitle = resumeByAi.title;
 
     const html = resumeTemplate(resumeByAi);
     const rawText = convert(html);
     // console.log("RawText", rawText);
-    
-    
-    const { pdfBuffer, thumbnailBuffer } = await generatePDFFromPage(warmPage, html);
+
+    const { pdfBuffer, thumbnailBuffer } = await generatePDFFromPage(
+      warmPage,
+      html,
+    );
 
     if (!pdfBuffer || !thumbnailBuffer) {
       return res.status(500).json({
@@ -56,7 +55,6 @@ export const createResume = async (req, res) => {
       });
     }
 
- 
     const resume = await ResumeModel.create({
       user: req.user.id,
       title: resumeTitle,
@@ -67,19 +65,18 @@ export const createResume = async (req, res) => {
       rawText,
       ...resumeByAi,
       atsScore: resumeByAi.atsScore,
-      isSaving: true, 
+      isSaving: true,
     });
 
-    
     res.status(201).json({
       message: "Resume Generated Successfully",
       resume: {
         ...resumeByAi,
-        _id: resume._id,     
+        _id: resume._id,
         title: resumeTitle,
-        resumeUrl: null,      
-        thumbnailUrl: null,   
-        isSaving: true,       
+        resumeUrl: null,
+        thumbnailUrl: null,
+        isSaving: true,
       },
       success: true,
     });
@@ -96,7 +93,7 @@ export const createResume = async (req, res) => {
         publicId,
         thumbnailUrl,
         thumbnailPublicId,
-        isSaving: false, 
+        isSaving: false,
       });
 
       console.log("Background save complete:", resumeUrl);
@@ -109,7 +106,6 @@ export const createResume = async (req, res) => {
       });
       console.error("Background save failed:", backgroundError.message);
     }
-
   } catch (error) {
     if (res.headersSent) return; // guard — background errors can't send responses
 
@@ -133,19 +129,29 @@ export const createResume = async (req, res) => {
  */
 export const getResumeById = async (req, res) => {
   const { resumeId } = req.params;
-  if (!resumeId) {
-    return res.status(400).json({
-      message: "Resume ID is required",
-      success: false,
-    });
-  }
+
   try {
+    if (!mongoose.Types.ObjectId.isValid(resumeId)) {
+      return res.status(400).json({
+        message: "Invalid Resume ID",
+        success: false,
+      });
+    }
     const resumeById = await ResumeModel.findOne({
       _id: resumeId,
     });
+
     if (!resumeById) {
       return res.status(404).json({
         message: "No resume found for this specification",
+        success: false,
+      });
+    }
+    const isOwner = String(resumeById.user) === String(req.user._id);
+    const isRecruiter = req.user.company;
+    if (!isOwner && !isRecruiter) {
+      return res.status(403).json({
+        message: "You're not allowed to view this resume",
         success: false,
       });
     }
