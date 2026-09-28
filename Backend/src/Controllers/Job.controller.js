@@ -383,6 +383,7 @@ export const getCompanyJobFeedController = asyncHandler(async (req, res) => {
 export const updateJobController = asyncHandler(async (req, res) => {
   const {
     title,
+    description,
     location,
     workMode,
     employmentType,
@@ -393,7 +394,40 @@ export const updateJobController = asyncHandler(async (req, res) => {
     salary,
   } = req.body;
 
-  if (title !== undefined) req.job.title = title;
+    if (title !== undefined) {
+    const trimmedTitle = String(title).trim();
+    if (!trimmedTitle) {
+      throw new ApiError(400, "Job title cannot be empty");
+    }
+
+    // Keep the hidden duplicate-check copy in sync, and block renaming
+    // to a title another job in this company already uses.
+    const normalizedTitle = trimmedTitle.toLowerCase();
+    if (normalizedTitle !== req.job.normalizedTitle) {
+      const duplicate = await JobModel.exists({
+        company: req.job.company,
+        normalizedTitle,
+        _id: { $ne: req.job._id },
+      });
+      if (duplicate) {
+        throw new ApiError(409, "Your company already has a job with this title");
+      }
+    }
+
+    req.job.title = trimmedTitle;
+    req.job.normalizedTitle = normalizedTitle;
+  }
+
+  if (description !== undefined) {
+    const trimmedDescription = String(description).trim();
+    if (trimmedDescription.length < 10) {
+      throw new ApiError(400, "Job description is too short");
+    }
+    if (trimmedDescription.length > 5000) {
+      throw new ApiError(400, "Maximum 5000 characters allowed");
+    }
+    req.job.description = trimmedDescription;
+  }
   if (location !== undefined) req.job.location = location;
   if (workMode !== undefined) req.job.workMode = workMode;
   if (employmentType !== undefined) req.job.employmentType = employmentType;
