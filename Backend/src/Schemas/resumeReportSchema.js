@@ -77,131 +77,77 @@ export const ResumeReportSchema = z.object({
   projects: z.array(ProjectSchema).default([]),
 });
 
-export const resumeGroqSchema = {
+// ─── What the model returns (the final resume is built by buildResume) ─────────
+const QUALITY_LABELS = ["strong", "good", "basic", "none"];
+
+export const resumeAiSchema = z.object({
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  experiences: z.array(z.object({ achievements: z.array(z.string()) })),
+  education: z.array(z.object({ degree: z.string() })),
+  skills: z.array(z.object({ description: z.string() })),
+  projects: z.array(z.object({ description: z.string() })),
+  atsAssessment: z.object({
+    achievementQuality: z.enum(QUALITY_LABELS),
+    projectQuality: z.enum(QUALITY_LABELS),
+    skillsFocus: z.enum(QUALITY_LABELS),
+  }),
+});
+
+const textItem = (key, description) => ({
   type: "object",
+  additionalProperties: false,
+  required: [key],
+  properties: { [key]: { type: "string", description } },
+});
+
+export const resumeAiGroqSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "summary", "experiences", "education", "skills", "projects", "atsAssessment"],
   properties: {
-    title: {
-      type: "string",
-      description: "Give a standard, professional title For the Resume",
-    },
-    fullName: { type: "string", description: "Full name of the resume owner" },
-    email: { type: "string", description: "Email of the resume owner" },
-    phone: { type: "string", description: "Phone number of the resume owner" },
-    location: { type: "string", description: "Location of the resume owner" },
-    portfolioUrl: {
-      type: "string",
-      description: "portfolio url of the resume owner",
-    },
-    linkedinUrl: {
-      type: "string",
-      description: "linkedin url of the resume owner",
-    },
-    githubProfileLink: {
-      type: "string",
-      description: "gitHub url of the resume owner",
-    },
-    summary: {
-      type: "string",
-      description: "professional summary of the resume owner ",
-    },
-    
+    title: { type: "string", description: "2–4 word professional title" },
+    summary: { type: "string", description: "Exactly 3 sentences, no 'I', no name" },
     experiences: {
       type: "array",
+      description: "Same count and order as the input experiences",
       items: {
         type: "object",
+        additionalProperties: false,
+        required: ["achievements"],
         properties: {
-          jobTitle: { type: "string" },
-          company: { type: "string" },
-          duration: { type: "string" },
-          expLocation: { type: "string" },
-          achievements: { type: "string" },
+          achievements: {
+            type: "array",
+            description: "One bullet per original statement, each starting with an action verb, 10–25 words",
+            items: { type: "string" },
+          },
         },
-        
-        required: [
-          "jobTitle",
-          "company",
-          "duration",
-          "expLocation",
-          "achievements",
-        ],
-         additionalProperties: false,
       },
     },
-
-   education: {
+    education: {
       type: "array",
-      items: {type: "object",
-      properties: {
-        degree: { type: "string" },
-        institution: { type: "string" },
-        result: { type: "string" },
-      },
-      required: ["degree", "institution", "result"],
-       additionalProperties: false,
-    }
-  },
-
+      description: "Same count and order as the input education",
+      items: textItem("degree", "Full official degree name; abbreviations expanded only"),
+    },
     skills: {
       type: "array",
-      items: {
-        type: "object",
-        properties: {
-          name: { type: "string" },
-          description: { type: "string" },
-        },
-        required: ["name", "description"],
-         additionalProperties: false,
-      },
+      description: "Same count and order as the input skills",
+      items: textItem("description", "One phrase, 4–12 words, no full stop"),
     },
-
-    certifications: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          name: { type: "string" },
-          issuer: { type: "string" },
-          issueDate: { type: "string" },
-          credentialUrl: { type: "string" },
-        },
-        required: ["name", "issuer", "issueDate", "credentialUrl"],
-         additionalProperties: false,
-      },
-    },
-
     projects: {
       type: "array",
-      items: {
-        type: "object",
-        properties: {
-          name: { type: "string" },
-          description: { type: "string" },
-          liveLink: { type: "string" },
-          githubLink: { type: "string" },
-        },
-        required: ["name", "description", "liveLink", "githubLink"],
-         additionalProperties: false,
+      description: "Same count and order as the input projects",
+      items: textItem("description", "1–2 sentences, 20–40 words"),
+    },
+    atsAssessment: {
+      type: "object",
+      additionalProperties: false,
+      required: ["achievementQuality", "projectQuality", "skillsFocus"],
+      properties: {
+        achievementQuality: { type: "string", enum: QUALITY_LABELS },
+        projectQuality: { type: "string", enum: QUALITY_LABELS },
+        skillsFocus: { type: "string", enum: QUALITY_LABELS },
       },
     },
-    atsScore:{type:"number", description:"Provide an ATS score Based on the resume details"}
   },
-  required: [
-    "title",
-    "fullName",
-    "email",
-    "phone",
-    "location",
-    "education",
-    "summary",
-    "experiences",
-    "skills",
-    "certifications",
-    "projects",
-    "atsScore",
-    "githubProfileLink",
-    "linkedinUrl",
-    "portfolioUrl"
-    
-  ],
-   additionalProperties: false,
 };
