@@ -4,50 +4,80 @@ import chromium from "@sparticuz/chromium";
 const isProduction = process.env.NODE_ENV === "production";
 
 let browserInstance = null;
+let launchPromise = null; // shared by concurrent callers so Chrome is only launched once
+let executablePathPromise = null; // the Chromium binary is unpacked to /tmp only once
 let pdfsGeneratedSinceRestart = 0;
 const MAX_PDFS_BEFORE_RESTART = 300;
+
+const launchBrowser = async () => {
+  if (!isProduction) {
+    return puppeteer.launch({
+      executablePath:
+        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      headless: true,
+      args: ["--no-sandbox"],
+    });
+  }
+
+  executablePathPromise ??= chromium.executablePath().catch((err) => {
+    executablePathPromise = null;
+    throw err;
+  });
+  const options = {
+    args: [...chromium.args, "--disable-dev-shm-usage"],
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await executablePathPromise,
+    headless: chromium.headless,
+  };
+
+  try {
+    return await puppeteer.launch(options);
+  } catch (err) {
+    // ETXTBSY = the freshly unpacked binary is still held open for writing; retry once
+    if (err.code !== "ETXTBSY") throw err;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return puppeteer.launch(options);
+  }
+};
 
 const getBrowser = async () => {
   const canReuse =
     browserInstance &&
-    browserInstance &&
+    browserInstance.connected &&
     pdfsGeneratedSinceRestart < MAX_PDFS_BEFORE_RESTART;
 
   if (canReuse) return browserInstance;
 
-  // Close old browser cleanly if it exists (e.g. restart threshold hit)
-  if (browserInstance) {
-    try {
-      await browserInstance.close();
-    } catch (err) {
-      console.warn("Old browser failed to close cleanly:", err.message);
+  // Another request is already launching Chrome — wait for that one
+  if (launchPromise) return launchPromise;
+
+  launchPromise = (async () => {
+    // Close old browser cleanly if it exists (e.g. restart threshold hit)
+    if (browserInstance) {
+      try {
+        await browserInstance.close();
+      } catch (err) {
+        console.warn("Old browser failed to close cleanly:", err.message);
+      }
     }
+
+    const browser = await launchBrowser();
+    pdfsGeneratedSinceRestart = 0;
+
+    browser.on("disconnected", () => {
+      console.warn("Browser disconnected — will relaunch on next request.");
+      if (browserInstance === browser) browserInstance = null;
+    });
+
+    browserInstance = browser;
+    return browser;
+  })();
+
+  try {
+    return await launchPromise;
+  } finally {
+    launchPromise = null;
   }
-
-  browserInstance = await puppeteer.launch(
-    isProduction
-      ? {
-          args: chromium.args,
-          defaultViewport: chromium.defaultViewport,
-          executablePath: await chromium.executablePath(),
-          headless: chromium.headless,
-        }
-      : {
-          executablePath:
-            "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-          headless: true,
-          args: ["--no-sandbox"],
-        },
-  );
-
-  pdfsGeneratedSinceRestart = 0;
-
-  browserInstance.on("disconnected", () => {
-    console.warn("Browser disconnected — will relaunch on next request.");
-    browserInstance = null;
-  });
-
-  return browserInstance;
 };
 
 export const warmUpPage = async () => {
