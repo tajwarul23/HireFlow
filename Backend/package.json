@@ -12,6 +12,9 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+    "engines": {
+    "node": "24.x"
+  },
   "dependencies": {
     "@emailjs/nodejs": "^5.0.2",
     "@sparticuz/chromium": "^148.0.0",
