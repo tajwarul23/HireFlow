@@ -4,7 +4,7 @@ import { useAuth } from "../Auth/Hooks/useAuth";
 import Brand from "../../Shared/Brand";
 import { candidateNavLinks, getNavLinks, recruiterNavLinks } from "../../Shared/navLinks";
 
-const LINKEDIN_URL = "https://www.linkedin.com/in/tajwarul-chowdhury-7288381a9/";
+const LINKEDIN_URL = "https://www.linkedin.com/in/tajwarul-hasan-chowdhury";
 
 // lucide-react no longer ships brand logos, so the LinkedIn mark is inlined.
 const LinkedInIcon = (props) => (
