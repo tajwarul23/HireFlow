@@ -1,5 +1,4 @@
-import dotenv from "dotenv";
-dotenv.config();
+import "dotenv/config"
 import app from "./app.js";
 import { connectToDB } from "./config/database.js";
 import { startJobExpireCron } from "./services/cron.service.js";

@@ -1,6 +1,6 @@
 import express from "express";
 import { authorizeRoles, verifyToken } from "../Middlewares/Auth.middleware.js";
-import { createJobController, deleteJobController, generateJobDescriptionController, getCompanyJobFeedController, getJobFeedController, updateJobController } from "../Controllers/Job.controller.js";
+import { createJobController, deleteJobController, generateJobDescriptionController, getCompanyJobFeedController, getJobByIdController, getJobFeedController, updateJobController } from "../Controllers/Job.controller.js";
 import { requireCompanyScope } from "../Middlewares/Role.middleware.js";
 import { aiLimiter } from "../Middlewares/rateLimit.middleware.js";
 
@@ -36,17 +36,29 @@ jobRouter.get("/", verifyToken, getJobFeedController)
  * @access Private [company_admin || recruiter]
  */
 jobRouter.get("/company", verifyToken, authorizeRoles("company_admin", "recruiter"), getCompanyJobFeedController)
+
+/**
+ * @route GET /api/job/:jobId
+ * @description get  a specific job
+ * @access All authenticated user
+ */
+
+jobRouter.get("/:jobId", verifyToken, getJobByIdController);
+
 /**
  * @route PATCH /api/job/:jobId
  * @description update a specific job
  * @access Private [company_admin || recruiter]
  */
+
 jobRouter.patch("/:jobId", verifyToken, authorizeRoles("company_admin", "recruiter"), requireCompanyScope, updateJobController)
 /**
  * @route DELETE /api/job/:jobId
  * @description delete a specific job
  * @access Private [company_admin || recruiter]
  */
+
+
 jobRouter.delete("/:jobId", verifyToken, authorizeRoles("company_admin", "recruiter"), requireCompanyScope, deleteJobController)
 
 export default jobRouter;

@@ -324,10 +324,31 @@ export const getJobFeedController = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @name getJobByIdController
+ * @description get specific job by the id for all user
+ * @access Private all authenticated user
+ */
+
+export const getJobByIdController = asyncHandler(async (req, res) => {
+  const jobId = req.params.jobId;
+
+  if (!mongoose.isValidObjectId(jobId)) {
+    throw new ApiError(400, "Invalid Job ID");
+  }
+  const job = await JobModel.findById(jobId).select("-normalizedTitle").lean();
+  if (!job) {
+    throw new ApiError(404, "No job found");
+  }
+
+  return res.status(200).json(new ApiResponse(200, job, "Job Fetched"));
+});
+
+/**
  * @name getCompanyController
  * @description get company's all job
  * @access Private [company_admin || recruiter]
  */
+
 export const getCompanyJobFeedController = asyncHandler(async (req, res) => {
   const dbUser = await userModel.findById(req.user.id);
   if (!dbUser) {
@@ -360,26 +381,24 @@ export const getCompanyJobFeedController = asyncHandler(async (req, res) => {
     JobModel.countDocuments(filter),
   ]);
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        {
-          count: totalJobs,
-          jobs,
-          pagination: {
-            totalJobs,
-            currentPage: Number(page),
-            totalPage: Math.ceil(totalJobs / pageSize),
-            limit: pageSize,
-            hasNextPage: Number(page) < Math.ceil(totalJobs / pageSize),
-            hasPreviousPage: Number(page) > 1,
-          },
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        count: totalJobs,
+        jobs,
+        pagination: {
+          totalJobs,
+          currentPage: Number(page),
+          totalPage: Math.ceil(totalJobs / pageSize),
+          limit: pageSize,
+          hasNextPage: Number(page) < Math.ceil(totalJobs / pageSize),
+          hasPreviousPage: Number(page) > 1,
         },
-        "Company Jobs fetched successfully",
-      ),
-    );
+      },
+      "Company Jobs fetched successfully",
+    ),
+  );
 });
 
 /**
@@ -402,13 +421,12 @@ export const updateJobController = asyncHandler(async (req, res) => {
     salary,
   } = req.body;
 
-    if (title !== undefined) {
+  if (title !== undefined) {
     const trimmedTitle = String(title).trim();
     if (!trimmedTitle) {
       throw new ApiError(400, "Job title cannot be empty");
     }
 
- 
     const normalizedTitle = trimmedTitle.toLowerCase();
     if (normalizedTitle !== req.job.normalizedTitle) {
       const duplicate = await JobModel.exists({
@@ -417,7 +435,10 @@ export const updateJobController = asyncHandler(async (req, res) => {
         _id: { $ne: req.job._id },
       });
       if (duplicate) {
-        throw new ApiError(409, "Your company already has a job with this title");
+        throw new ApiError(
+          409,
+          "Your company already has a job with this title",
+        );
       }
     }
 
@@ -458,11 +479,10 @@ export const updateJobController = asyncHandler(async (req, res) => {
       req.job.salary.currency = currency;
     }
   }
-  if(!req.job.isModified()){
-    
-  return res
-    .status(200)
-    .json(new ApiResponse(200, req.job, "No Changes to update"));
+  if (!req.job.isModified()) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, req.job, "No Changes to update"));
   }
   await req.job.save();
 
