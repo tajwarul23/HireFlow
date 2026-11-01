@@ -1,4 +1,4 @@
- import { applicationModel } from "../Models/application.model.js";
+import { applicationModel } from "../Models/application.model.js";
 import { CompanyModel } from "../Models/company.model.js";
 import { JobModel } from "../Models/job.model.js";
 import { userModel } from "../Models/user.model.js";
@@ -15,10 +15,12 @@ import { createNotification } from "../services/createNotification.js";
 import mongoose from "mongoose";
 import crypto from "node:crypto";
 import { InviteModel } from "../Models/invite.model.js";
+import { redis } from "../config/redis.js";
 
 const INVITE_LIFETIME_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-const hashToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
+const hashToken = (token) =>
+  crypto.createHash("sha256").update(token).digest("hex");
 
 // Saves a one-time invite in the database and returns the link that carries its token.
 const createInviteLink = async ({ companyId, createdBy, email = null }) => {
@@ -164,10 +166,14 @@ export const joinCompanyController = asyncHandler(async (req, res) => {
   const { token } = req.query;
   if (!token) throw new ApiError(400, "Invite token is required");
 
-  const invite = await InviteModel.findOne({ tokenHash: hashToken(String(token)) });
+  const invite = await InviteModel.findOne({
+    tokenHash: hashToken(String(token)),
+  });
   if (!invite) throw new ApiError(400, "Invalid invite link");
-  if (invite.usedAt) throw new ApiError(400, "This invite link has already been used");
-  if (invite.expiresAt < new Date()) throw new ApiError(400, "This invite link has expired");
+  if (invite.usedAt)
+    throw new ApiError(400, "This invite link has already been used");
+  if (invite.expiresAt < new Date())
+    throw new ApiError(400, "This invite link has expired");
 
   const company = await CompanyModel.findById(invite.company);
   if (!company) throw new ApiError(404, "Company not found");
@@ -179,7 +185,13 @@ export const joinCompanyController = asyncHandler(async (req, res) => {
     // Already a member: don't use up the invite, so it can still go to someone else.
     return res
       .status(200)
-      .json(new ApiResponse(200, req.user, `Already a member of ${company.companyName}`));
+      .json(
+        new ApiResponse(
+          200,
+          req.user,
+          `Already a member of ${company.companyName}`,
+        ),
+      );
   }
 
   // Use up the invite. The "usedAt: null" condition means that if two people
@@ -188,7 +200,8 @@ export const joinCompanyController = asyncHandler(async (req, res) => {
     { _id: invite._id, usedAt: null },
     { usedAt: new Date(), usedBy: req.user._id },
   );
-  if (!claimed) throw new ApiError(400, "This invite link has already been used");
+  if (!claimed)
+    throw new ApiError(400, "This invite link has already been used");
 
   const updatedUser = await userModel.findByIdAndUpdate(
     req.user.id,
@@ -278,16 +291,24 @@ export const updateCompanyController = asyncHandler(async (req, res) => {
   await company.save();
 
   if (companyNameChanged) {
-    await JobModel.updateMany(
-      {
-        company: company._id,
-      },
-      {
-        $set: {
-          companyName: company.companyName,
+    const ids = await JobModel.find({ company: company._id }).distinct("_id");
+    if (ids.length) {
+      await JobModel.updateMany(
+        {
+          company: company._id,
         },
-      },
-    );
+        {
+          $set: {
+            companyName: company.companyName,
+          },
+        },
+      );
+      try {
+        await redis.del(...ids.map((id) => `job:${id}`));
+      } catch (error) {
+        console.error("Redis del failed on company rename", error.message);
+      }
+    }
   }
 
   return res
