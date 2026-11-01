@@ -1,9 +1,3 @@
-/**
- * @name createJobController
- * @description RECRUITER only, creating job opening
- * @access Private
- */
-
 import mongoose from "mongoose";
 import { CompanyModel } from "../Models/company.model.js";
 import { JobModel } from "../Models/job.model.js";
@@ -12,6 +6,8 @@ import { generateJobDescription } from "../services/ai.service.js";
 import ApiError from "../Utils/ApiError.js";
 import ApiResponse from "../Utils/ApiResponse.js";
 import asyncHandler from "../Utils/asyncHandler.js";
+import { redis } from "../config/redis.js";
+
 
 /**
  * @name createJobController
@@ -335,9 +331,28 @@ export const getJobByIdController = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(jobId)) {
     throw new ApiError(400, "Invalid Job ID");
   }
+  const key = `job:${jobId}`;
+  try {
+    const cached = await redis.get(key);
+    if (cached) {
+      console.log("HIT", key);
+      return res
+        .status(200)
+        .json(new ApiResponse(200, JSON.parse(cached), "Job Fetched"));
+    }
+  } catch (error) {
+    console.error("Redis GET error", error.message);
+  }
+  console.log("MISS", key);
   const job = await JobModel.findById(jobId).select("-normalizedTitle").lean();
   if (!job) {
     throw new ApiError(404, "No job found");
+  }
+
+  try {
+    await redis.set(key, JSON.stringify(job), "EX", 300); //5min
+  } catch (error) {
+    console.error("Redis SET failed", error.message);
   }
 
   return res.status(200).json(new ApiResponse(200, job, "Job Fetched"));
@@ -485,6 +500,13 @@ export const updateJobController = asyncHandler(async (req, res) => {
       .json(new ApiResponse(200, req.job, "No Changes to update"));
   }
   await req.job.save();
+  try {
+    const key = `job:${req.job._id}`;
+    await redis.del(key);
+  } catch (error) {
+    console.log("Redis DEL failed on Job update", error.message);
+    
+  }
 
   return res
     .status(200)
@@ -498,7 +520,14 @@ export const updateJobController = asyncHandler(async (req, res) => {
  */
 
 export const deleteJobController = asyncHandler(async (req, res) => {
+  const jobId = req.job._id;
   await req.job.deleteOne();
+  try {
+    const key = `job:${jobId}`;
+    await redis.del(key);
+  } catch (error) {
+    console.error("Redis error on delete job controller", error.message);
+  }
   return res
     .status(200)
     .json(new ApiResponse(200, null, "Job deleted successfully"));
